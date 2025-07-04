@@ -1,0 +1,23 @@
+---
+galaxy_info:
+  author: System Administrator
+  description: 系统基础初始化配置
+  license: MIT
+  min_ansible_version: 2.9
+  platforms:
+    - name: EL
+      versions:
+        - 7
+        - 8
+        - 9
+    - name: Ubuntu
+      versions:
+        - 18.04
+        - 20.04
+        - 22.04
+    - name: Debian
+      versions:
+        - 10
+        - 11
+
+dependencies: [] 

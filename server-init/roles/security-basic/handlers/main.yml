@@ -1,0 +1,17 @@
+---
+# 安全配置处理程序
+
+- name: restart sshd
+  service:
+    name: "{{ 'ssh' if ansible_os_family == 'Debian' else 'sshd' }}"
+    state: restarted
+
+- name: restart fail2ban
+  service:
+    name: fail2ban
+    state: restarted
+
+- name: restart chrony
+  service:
+    name: chronyd
+    state: restarted 

@@ -1,0 +1,33 @@
+---
+# 用户配置示例
+# 将此配置添加到 group_vars/all.yml 或相应环境的变量文件中
+
+# 管理员用户配置
+admin_users:
+  - name: admin
+    groups: ["{{ admin_group }}"]
+    shell: /bin/bash
+    ssh_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7... admin@company.com"
+    
+  - name: deploy
+    groups: ["{{ admin_group }}"]
+    shell: /bin/bash
+    ssh_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQD4... deploy@company.com"
+    
+  - name: monitoring
+    groups: ["{{ admin_group }}"]
+    shell: /bin/bash
+    ssh_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQD8... monitoring@company.com"
+
+# 如果你需要创建普通用户（无sudo权限）
+regular_users:
+  - name: app_user
+    groups: ["users"]
+    shell: /bin/bash
+    home: /opt/app
+    ssh_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQD2... app@company.com"
+
+# SSH公钥获取方法：
+# 1. 生成SSH密钥对: ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
+# 2. 查看公钥内容: cat ~/.ssh/id_rsa.pub
+# 3. 将公钥内容复制到上面的ssh_key字段中 

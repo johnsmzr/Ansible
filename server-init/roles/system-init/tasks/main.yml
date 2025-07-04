@@ -1,0 +1,125 @@
+---
+# 系统初始化任务
+
+- name: "设置服务器时区"
+  timezone:
+    name: "{{ server_timezone | default('Asia/Shanghai') }}"
+  tags: ['timezone']
+
+- name: "设置主机名"
+  hostname:
+    name: "{{ inventory_hostname }}"
+  when: set_hostname | default(true)
+  tags: ['hostname']
+
+- name: "更新/etc/hosts文件"
+  lineinfile:
+    path: /etc/hosts
+    line: "127.0.0.1 {{ inventory_hostname }}"
+    state: present
+  when: set_hostname | default(true)
+  tags: ['hostname', 'hosts']
+
+- name: "设置系统语言环境"
+  lineinfile:
+    path: /etc/environment
+    line: "{{ item }}"
+    state: present
+  loop:
+    - "LANG=en_US.UTF-8"
+    - "LC_ALL=en_US.UTF-8"
+  tags: ['locale']
+
+- name: "配置系统limits"
+  copy:
+    dest: /etc/security/limits.d/99-custom.conf
+    content: |
+      # 自定义系统limits配置
+      * soft nofile 65536
+      * hard nofile 65536
+      * soft nproc 32768
+      * hard nproc 32768
+      root soft nofile 65536
+      root hard nofile 65536
+    backup: yes
+  tags: ['limits']
+
+- name: "配置内核参数"
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    sysctl_set: yes
+    state: present
+    reload: yes
+  loop:
+    - { name: 'net.core.somaxconn', value: '65535' }
+    - { name: 'net.core.netdev_max_backlog', value: '32768' }
+    - { name: 'net.ipv4.tcp_max_syn_backlog', value: '65535' }
+    - { name: 'net.ipv4.tcp_fin_timeout', value: '10' }
+    - { name: 'net.ipv4.tcp_keepalive_time', value: '1200' }
+    - { name: 'net.ipv4.ip_local_port_range', value: '10000 65000' }
+    - { name: 'vm.swappiness', value: '10' }
+    - { name: 'fs.file-max', value: '6553560' }
+  tags: ['sysctl', 'kernel']
+
+- name: "创建常用目录"
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /opt/scripts
+    - /opt/backup
+    - /var/log/custom
+    - /data
+  tags: ['directories']
+
+- name: "配置系统日志轮转"
+  copy:
+    dest: /etc/logrotate.d/custom
+    content: |
+      /var/log/custom/*.log {
+          daily
+          missingok
+          rotate 30
+          compress
+          delaycompress
+          notifempty
+          copytruncate
+      }
+  tags: ['logrotate']
+
+- name: "禁用不需要的服务 (CentOS/RHEL)"
+  service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: no
+  loop:
+    - postfix
+  when: 
+    - ansible_os_family == "RedHat"
+    - disable_unnecessary_services | default(true)
+  ignore_errors: yes
+  tags: ['services']
+
+- name: "启用必要的服务"
+  service:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  loop:
+    - cron
+  when: ansible_os_family == "Debian"
+  ignore_errors: yes
+  tags: ['services']
+
+- name: "启用必要的服务 (CentOS/RHEL)"
+  service:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  loop:
+    - crond
+  when: ansible_os_family == "RedHat"
+  ignore_errors: yes
+  tags: ['services'] 

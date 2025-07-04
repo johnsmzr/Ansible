@@ -1,0 +1,29 @@
+---
+# 生产环境特定变量
+
+# 环境标识
+environment_name: "production"
+
+# 安全配置（生产环境更严格）
+configure_firewall: true
+install_fail2ban: true
+configure_ssh: true
+
+# SSH配置（生产环境禁用密码登录）
+ssh_password_authentication: false
+ssh_permit_root_login: false
+
+# 系统配置
+disable_unnecessary_services: true
+lock_system_users: true
+
+# 监控和日志
+log_retention_days: 90
+enable_audit_logging: true
+
+# 备份配置
+backup_enabled: true
+backup_retention_days: 30
+
+# 性能优化（生产环境更保守）
+vm_swappiness: 1 

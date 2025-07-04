@@ -1,0 +1,59 @@
+---
+# 全局变量配置文件
+# 所有主机组都会使用这些变量
+
+# 系统配置
+server_timezone: "Asia/Shanghai"
+set_hostname: true
+disable_unnecessary_services: true
+
+# 安全配置
+configure_ssh: true
+install_fail2ban: true
+configure_firewall: false  # 默认关闭防火墙配置，根据需要开启
+lock_system_users: true
+
+# NTP服务器
+ntp_server: "pool.ntp.org"
+
+# 管理员组名（CentOS/RHEL使用wheel，Ubuntu使用sudo）
+admin_group: "{{ 'wheel' if ansible_os_family == 'RedHat' else 'sudo' }}"
+
+# 管理员用户配置（示例，请根据实际需要修改）
+admin_users:
+  # - name: admin
+  #   groups: ["{{ admin_group }}"]
+  #   shell: /bin/bash
+  #   ssh_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAB... admin@example.com"
+  # - name: deploy
+  #   groups: ["{{ admin_group }}"]
+  #   shell: /bin/bash
+  #   ssh_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAB... deploy@example.com"
+
+# 软件包配置
+python_packages:
+  - requests
+  - urllib3
+  - setuptools
+  - wheel
+
+# 系统优化参数
+system_limits:
+  soft_nofile: 65536
+  hard_nofile: 65536
+  soft_nproc: 32768
+  hard_nproc: 32768
+
+# 内核参数
+kernel_parameters:
+  net.core.somaxconn: 65535
+  net.core.netdev_max_backlog: 32768
+  net.ipv4.tcp_max_syn_backlog: 65535
+  net.ipv4.tcp_fin_timeout: 10
+  net.ipv4.tcp_keepalive_time: 1200
+  net.ipv4.ip_local_port_range: "10000 65000"
+  vm.swappiness: 10
+  fs.file-max: 6553560
+
+# 日志配置
+log_retention_days: 30 

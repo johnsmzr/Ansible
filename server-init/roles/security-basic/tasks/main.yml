@@ -1,0 +1,120 @@
+---
+# 基础安全配置任务
+
+- name: "配置SSH安全设置"
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    backup: yes
+  loop:
+    - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin yes' }
+    - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+    - { regexp: '^#?PubkeyAuthentication', line: 'PubkeyAuthentication yes' }
+    - { regexp: '^#?Protocol', line: 'Protocol 2' }
+    - { regexp: '^#?Port', line: 'Port 22' }
+    - { regexp: '^#?MaxAuthTries', line: 'MaxAuthTries 3' }
+    - { regexp: '^#?ClientAliveInterval', line: 'ClientAliveInterval 300' }
+    - { regexp: '^#?ClientAliveCountMax', line: 'ClientAliveCountMax 2' }
+    - { regexp: '^#?X11Forwarding', line: 'X11Forwarding no' }
+    - { regexp: '^#?UseDNS', line: 'UseDNS no' }
+  notify: restart sshd
+  when: configure_ssh | default(true)
+  tags: ['ssh', 'security']
+
+- name: "安装fail2ban (Ubuntu/Debian)"
+  package:
+    name: fail2ban
+    state: present
+  when: 
+    - ansible_os_family == "Debian"
+    - install_fail2ban | default(true)
+  tags: ['fail2ban', 'security']
+
+- name: "安装fail2ban (CentOS/RHEL)"
+  package:
+    name: fail2ban
+    state: present
+  when: 
+    - ansible_os_family == "RedHat"
+    - install_fail2ban | default(true)
+  tags: ['fail2ban', 'security']
+
+- name: "配置fail2ban"
+  copy:
+    dest: /etc/fail2ban/jail.local
+    content: |
+      [DEFAULT]
+      bantime = 3600
+      findtime = 600
+      maxretry = 3
+      
+      [sshd]
+      enabled = true
+      port = ssh
+      filter = sshd
+      logpath = /var/log/auth.log
+      maxretry = 3
+    backup: yes
+  notify: restart fail2ban
+  when: install_fail2ban | default(true)
+  tags: ['fail2ban', 'security']
+
+- name: "配置防火墙规则 (UFW - Ubuntu/Debian)"
+  ufw:
+    rule: "{{ item.rule }}"
+    port: "{{ item.port }}"
+    proto: "{{ item.proto | default('tcp') }}"
+  loop:
+    - { rule: 'allow', port: '22', proto: 'tcp' }
+    - { rule: 'allow', port: '80', proto: 'tcp' }
+    - { rule: 'allow', port: '443', proto: 'tcp' }
+  when: 
+    - ansible_os_family == "Debian"
+    - configure_firewall | default(false)
+  tags: ['firewall', 'security']
+
+- name: "启用UFW (Ubuntu/Debian)"
+  ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+  when: 
+    - ansible_os_family == "Debian"
+    - configure_firewall | default(false)
+  tags: ['firewall', 'security']
+
+- name: "安装并配置chrony时间同步"
+  package:
+    name: chrony
+    state: present
+  tags: ['ntp', 'time']
+
+- name: "配置chrony"
+  lineinfile:
+    path: /etc/chrony.conf
+    regexp: '^server '
+    line: 'server {{ ntp_server | default("pool.ntp.org") }} iburst'
+    backup: yes
+  notify: restart chrony
+  tags: ['ntp', 'time']
+
+- name: "启用chrony服务"
+  service:
+    name: chronyd
+    state: started
+    enabled: yes
+  tags: ['ntp', 'time']
+
+- name: "配置系统审计日志保留"
+  lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    backup: yes
+  loop:
+    - { regexp: '^max_log_file_action', line: 'max_log_file_action = ROTATE' }
+    - { regexp: '^num_logs', line: 'num_logs = 10' }
+  when: ansible_os_family == "RedHat"
+  ignore_errors: yes
+  tags: ['audit', 'security'] 

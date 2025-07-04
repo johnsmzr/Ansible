@@ -1,0 +1,22 @@
+---
+# 仅执行安全配置 - 用于已有服务器的安全加固
+# 使用方法: ansible-playbook -i inventory/hosts.yml playbooks/security-only.yml
+
+- name: "服务器安全配置"
+  hosts: all
+  become: yes
+  gather_facts: yes
+  
+  roles:
+    - role: security-basic
+      tags: ['security']
+
+  post_tasks:
+    - name: "显示安全配置完成信息"
+      debug:
+        msg: |
+          安全配置完成！
+          主机: {{ inventory_hostname }}
+          已配置: SSH安全设置, fail2ban, 时间同步, 防火墙规则
+          建议: 请检查SSH配置并测试连接正常后再断开当前会话
+      tags: ['info'] 

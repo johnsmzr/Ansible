@@ -1,0 +1,79 @@
+---
+# 快速安装基础工具 - 仅安装软件包，不做系统配置
+# 使用方法: ansible-playbook -i inventory/hosts.yml playbooks/quick-install.yml
+
+- name: "快速安装基础工具"
+  hosts: all
+  become: yes
+  gather_facts: yes
+  
+  tasks:
+    - name: "更新系统包缓存"
+      package:
+        update_cache: yes
+      when: ansible_os_family in ['Debian', 'RedHat']
+      tags: ['update']
+
+    - name: "安装基础工具 (CentOS/RHEL/Rocky)"
+      package:
+        name:
+          - vim
+          - curl
+          - wget
+          - htop
+          - git
+          - unzip
+          - tree
+          - nano
+          - rsync
+          - screen
+          - tmux
+          - lsof
+          - netstat-nat
+          - tcpdump
+          - bind-utils
+          - telnet
+          - nc
+        state: present
+      when: ansible_os_family == "RedHat"
+      tags: ['packages']
+
+    - name: "安装基础工具 (Ubuntu/Debian)"
+      package:
+        name:
+          - vim
+          - curl
+          - wget
+          - htop
+          - git
+          - unzip
+          - tree
+          - nano
+          - rsync
+          - screen
+          - tmux
+          - lsof
+          - net-tools
+          - tcpdump
+          - dnsutils
+          - telnet
+          - netcat-openbsd
+        state: present
+      when: ansible_os_family == "Debian"
+      tags: ['packages']
+
+    - name: "安装Python3和pip"
+      package:
+        name:
+          - python3
+          - python3-pip
+        state: present
+      tags: ['python']
+
+    - name: "显示安装完成信息"
+      debug:
+        msg: |
+          基础工具安装完成！
+          主机: {{ inventory_hostname }}
+          已安装: vim, curl, htop, git, wget, unzip, tree, nano, rsync, screen, tmux, lsof, python3
+      tags: ['info'] 

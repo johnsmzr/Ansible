@@ -1,0 +1,91 @@
+---
+# 示例inventory配置文件
+# 复制并修改此文件为 inventory/hosts.yml
+
+all:
+  children:
+    # 生产服务器组
+    production:
+      hosts:
+        web-prod-01:
+          ansible_host: 10.0.1.10
+          ansible_user: root
+          # 或使用普通用户: ansible_user: ubuntu
+          # ansible_ssh_private_key_file: ~/.ssh/prod_key
+        
+        web-prod-02:
+          ansible_host: 10.0.1.11
+          ansible_user: root
+          
+        db-prod-01:
+          ansible_host: 10.0.1.20
+          ansible_user: root
+          
+      vars:
+        environment_type: production
+        # 生产环境特定变量
+        configure_firewall: true
+        install_fail2ban: true
+        log_retention_days: 90
+
+    # 测试环境服务器组  
+    staging:
+      hosts:
+        web-staging-01:
+          ansible_host: 10.0.2.10
+          ansible_user: ubuntu
+          ansible_become: yes
+          
+        db-staging-01:
+          ansible_host: 10.0.2.20
+          ansible_user: ubuntu
+          ansible_become: yes
+          
+      vars:
+        environment_type: staging
+        configure_firewall: false
+        install_fail2ban: true
+
+    # 开发环境服务器组
+    development:
+      hosts:
+        dev-server-01:
+          ansible_host: 192.168.1.100
+          ansible_user: vagrant
+          ansible_ssh_private_key_file: ~/.vagrant.d/insecure_private_key
+          
+        dev-server-02:
+          ansible_host: 192.168.1.101
+          ansible_user: vagrant
+          ansible_ssh_private_key_file: ~/.vagrant.d/insecure_private_key
+          
+      vars:
+        environment_type: development
+        configure_firewall: false
+        install_fail2ban: false
+
+    # 按服务类型分组
+    webservers:
+      hosts:
+        web-prod-01:
+        web-prod-02:
+        web-staging-01:
+      vars:
+        server_role: webserver
+        
+    databases:
+      hosts:
+        db-prod-01:
+        db-staging-01:
+      vars:
+        server_role: database
+
+  vars:
+    # 全局变量
+    ansible_python_interpreter: /usr/bin/python3
+    
+    # SSH连接设置
+    # ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+    
+    # 如果所有服务器使用相同的SSH密钥
+    # ansible_ssh_private_key_file: ~/.ssh/id_rsa 

@@ -1,0 +1,33 @@
+---
+# 开发环境特定变量
+
+# 环境标识
+environment_name: "development"
+
+# 安全配置（开发环境相对宽松）
+configure_firewall: false
+install_fail2ban: false
+configure_ssh: true
+
+# SSH配置（开发环境允许密码登录）
+ssh_password_authentication: true
+ssh_permit_root_login: true
+
+# 系统配置
+disable_unnecessary_services: false
+lock_system_users: false
+
+# 监控和日志
+log_retention_days: 7
+enable_audit_logging: false
+
+# 开发工具
+install_development_tools: true
+development_packages:
+  - nodejs
+  - npm
+  - docker
+  - docker-compose
+
+# 性能配置（开发环境可以更激进）
+vm_swappiness: 30 

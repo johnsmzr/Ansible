@@ -1,0 +1,42 @@
+---
+# 主要的服务器初始化playbook
+# 使用方法: ansible-playbook -i inventory/hosts.yml site.yml
+
+- name: "服务器初始化 - 系统基础配置"
+  hosts: all
+  become: yes
+  gather_facts: yes
+  
+  pre_tasks:
+    - name: "更新系统包缓存"
+      package:
+        update_cache: yes
+      when: ansible_os_family in ['Debian', 'RedHat']
+      tags: ['system', 'update']
+
+  roles:
+    - role: system-init
+      tags: ['system', 'init']
+    - role: basic-tools
+      tags: ['tools', 'packages']
+    - role: security-basic
+      tags: ['security']
+    - role: user-management
+      tags: ['users']
+
+  post_tasks:
+    - name: "重启服务器（如果需要）"
+      reboot:
+        reboot_timeout: 300
+      when: reboot_required is defined and reboot_required
+      tags: ['reboot']
+      
+    - name: "显示完成信息"
+      debug:
+        msg: |
+          服务器初始化完成！
+          主机: {{ inventory_hostname }}
+          操作系统: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          内核版本: {{ ansible_kernel }}
+          安装的工具: vim, curl, htop, git, wget, unzip, tree
+      tags: ['info'] 

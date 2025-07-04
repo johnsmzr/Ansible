@@ -1,0 +1,123 @@
+---
+# 基础工具安装任务
+
+- name: "安装基础开发工具包 (CentOS/RHEL/Rocky)"
+  package:
+    name:
+      - vim
+      - curl
+      - wget
+      - htop
+      - git
+      - unzip
+      - tree
+      - nano
+      - rsync
+      - screen
+      - tmux
+      - lsof
+      - netstat-nat
+      - tcpdump
+      - bind-utils  # nslookup, dig
+      - telnet
+      - nc  # netcat
+    state: present
+  when: ansible_os_family == "RedHat"
+  tags: ['packages', 'tools']
+
+- name: "安装基础开发工具包 (Ubuntu/Debian)"
+  package:
+    name:
+      - vim
+      - curl
+      - wget
+      - htop
+      - git
+      - unzip
+      - tree
+      - nano
+      - rsync
+      - screen
+      - tmux
+      - lsof
+      - net-tools  # netstat
+      - tcpdump
+      - dnsutils   # nslookup, dig
+      - telnet
+      - netcat-openbsd
+      - software-properties-common
+      - apt-transport-https
+      - ca-certificates
+      - gnupg
+      - lsb-release
+    state: present
+  when: ansible_os_family == "Debian"
+  tags: ['packages', 'tools']
+
+- name: "配置vim基础设置"
+  copy:
+    dest: /etc/vim/vimrc.local
+    content: |
+      " 基础vim配置
+      set number
+      set tabstop=4
+      set shiftwidth=4
+      set expandtab
+      set hlsearch
+      set incsearch
+      set ignorecase
+      set smartcase
+      syntax on
+      set background=dark
+      set autoindent
+      set smartindent
+    backup: yes
+  tags: ['config', 'vim']
+
+- name: "创建全局别名配置"
+  copy:
+    dest: /etc/profile.d/custom_aliases.sh
+    content: |
+      # 自定义别名
+      alias ll='ls -alF'
+      alias la='ls -A'
+      alias l='ls -CF'
+      alias ..='cd ..'
+      alias ...='cd ../..'
+      alias grep='grep --color=auto'
+      alias fgrep='fgrep --color=auto'
+      alias egrep='egrep --color=auto'
+      alias h='history'
+      alias df='df -h'
+      alias du='du -h'
+      alias free='free -h'
+      alias ps='ps aux'
+      alias top='htop'
+    mode: '0644'
+  tags: ['config', 'aliases']
+
+- name: "安装Python3和pip (如果不存在)"
+  package:
+    name:
+      - python3
+      - python3-pip
+    state: present
+  tags: ['python']
+
+- name: "升级pip到最新版本"
+  pip:
+    name: pip
+    state: latest
+    executable: pip3
+  tags: ['python', 'pip']
+
+- name: "安装常用Python包"
+  pip:
+    name:
+      - requests
+      - urllib3
+      - setuptools
+      - wheel
+    state: present
+    executable: pip3
+  tags: ['python', 'packages'] 

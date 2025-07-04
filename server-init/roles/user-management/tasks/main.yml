@@ -1,0 +1,113 @@
+---
+# 用户管理任务
+
+- name: "创建管理员用户组"
+  group:
+    name: "{{ admin_group | default('wheel') }}"
+    state: present
+  tags: ['users', 'groups']
+
+- name: "创建管理员用户"
+  user:
+    name: "{{ item.name }}"
+    groups: "{{ item.groups | default([admin_group | default('wheel')]) }}"
+    shell: "{{ item.shell | default('/bin/bash') }}"
+    create_home: yes
+    state: present
+  loop: "{{ admin_users | default([]) }}"
+  when: admin_users is defined
+  tags: ['users']
+
+- name: "为管理员用户设置SSH公钥"
+  authorized_key:
+    user: "{{ item.name }}"
+    key: "{{ item.ssh_key }}"
+    state: present
+  loop: "{{ admin_users | default([]) }}"
+  when: 
+    - admin_users is defined
+    - item.ssh_key is defined
+  tags: ['users', 'ssh-keys']
+
+- name: "配置sudo权限"
+  lineinfile:
+    path: /etc/sudoers
+    line: "%{{ admin_group | default('wheel') }} ALL=(ALL) NOPASSWD: ALL"
+    validate: 'visudo -cf %s'
+    backup: yes
+  tags: ['sudo']
+
+- name: "创建用户目录结构"
+  file:
+    path: "/home/{{ item.name }}/{{ dir }}"
+    state: directory
+    owner: "{{ item.name }}"
+    group: "{{ item.name }}"
+    mode: '0755'
+  loop: "{{ admin_users | default([]) }}"
+  loop_control:
+    loop_var: user
+  vars:
+    dirs:
+      - scripts
+      - backup
+      - logs
+  with_subelements:
+    - "{{ admin_users | default([]) }}"
+    - "{{ dirs }}"
+  loop_control:
+    loop_var: item
+  when: admin_users is defined
+  tags: ['users', 'directories']
+
+- name: "为用户配置基础shell环境"
+  copy:
+    dest: "/home/{{ item.name }}/.bashrc"
+    content: |
+      # 用户bash配置
+      export PS1='\u@\h:\w\$ '
+      export HISTSIZE=10000
+      export HISTFILESIZE=10000
+      export HISTCONTROL=ignoredups:ignorespace
+      
+      # 启用颜色支持
+      export TERM=xterm-color
+      export GREP_OPTIONS='--color=auto'
+      export CLICOLOR=1
+      
+      # 自定义别名
+      if [ -f /etc/profile.d/custom_aliases.sh ]; then
+          source /etc/profile.d/custom_aliases.sh
+      fi
+      
+      # 加载系统bashrc
+      if [ -f /etc/bashrc ]; then
+          source /etc/bashrc
+      fi
+    owner: "{{ item.name }}"
+    group: "{{ item.name }}"
+    mode: '0644'
+    backup: yes
+  loop: "{{ admin_users | default([]) }}"
+  when: admin_users is defined
+  tags: ['users', 'shell']
+
+- name: "锁定不需要的系统用户"
+  user:
+    name: "{{ item }}"
+    shell: /sbin/nologin
+  loop:
+    - bin
+    - daemon
+    - adm
+    - lp
+    - sync
+    - shutdown
+    - halt
+    - mail
+    - operator
+    - games
+    - ftp
+  ignore_errors: yes
+  when: lock_system_users | default(true)
+  tags: ['users', 'security'] 
