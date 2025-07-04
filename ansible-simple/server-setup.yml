@@ -35,9 +35,47 @@
         name: "{{ server_timezone }}"
       tags: ['system']
 
-    - name: "设置主机名"
+    - name: "确保时区配置文件正确"
+      file:
+        src: "/usr/share/zoneinfo/{{ server_timezone }}"
+        dest: "/etc/localtime"
+        state: link
+        force: yes
+      tags: ['system']
+
+    - name: "写入时区到/etc/timezone"
+      copy:
+        content: "{{ server_timezone }}\n"
+        dest: /etc/timezone
+        mode: '0644'
+      tags: ['system']
+
+    - name: "设置主机名到/etc/hostname"
+      copy:
+        content: "{{ inventory_hostname }}\n"
+        dest: /etc/hostname
+        mode: '0644'
+      tags: ['system']
+
+    - name: "设置运行时主机名"
       hostname:
         name: "{{ inventory_hostname }}"
+      tags: ['system']
+
+    - name: "更新/etc/hosts文件"
+      lineinfile:
+        path: /etc/hosts
+        regexp: '^127\.0\.1\.1'
+        line: "127.0.1.1\t{{ inventory_hostname }}"
+        backup: yes
+      tags: ['system']
+
+    - name: "确保localhost条目存在"
+      lineinfile:
+        path: /etc/hosts
+        regexp: '^127\.0\.0\.1'
+        line: "127.0.0.1\tlocalhost"
+        backup: yes
       tags: ['system']
 
     # 2. 安装基础软件
@@ -109,15 +147,30 @@
         mode: '0644'
       tags: ['config']
 
-    # 6. 显示完成信息
+    # 6. 验证配置
+    - name: "验证时区设置"
+      command: timedatectl show --property=Timezone --value
+      register: current_timezone
+      changed_when: false
+      tags: ['system', 'verify']
+
+    - name: "验证主机名设置"
+      command: hostname
+      register: current_hostname
+      changed_when: false
+      tags: ['system', 'verify']
+
+    # 7. 显示完成信息
     - name: "显示配置完成信息"
       debug:
         msg: |
           ✅ 服务器配置完成！
-          📍 主机: {{ inventory_hostname }}
+          📍 主机: {{ inventory_hostname }} (当前: {{ current_hostname.stdout }})
           🖥️  系统: {{ ansible_distribution }} {{ ansible_distribution_version }}
           🔧 已安装工具: {{ install_packages | join(', ') }}
-          🕐 时区: {{ server_timezone }}
+          🕐 时区: {{ server_timezone }} (当前: {{ current_timezone.stdout }})
+          
+          ⚠️  注意：主机名和时区的完全生效可能需要重启系统
       tags: ['info']
 
   handlers:
