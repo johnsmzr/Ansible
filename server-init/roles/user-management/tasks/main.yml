@@ -37,26 +37,36 @@
     backup: yes
   tags: ['sudo']
 
-- name: "创建用户目录结构"
+- name: "创建用户scripts目录"
   file:
-    path: "/home/{{ item.name }}/{{ dir }}"
+    path: "/home/{{ item.name }}/scripts"
     state: directory
     owner: "{{ item.name }}"
     group: "{{ item.name }}"
     mode: '0755'
   loop: "{{ admin_users | default([]) }}"
-  loop_control:
-    loop_var: user
-  vars:
-    dirs:
-      - scripts
-      - backup
-      - logs
-  with_subelements:
-    - "{{ admin_users | default([]) }}"
-    - "{{ dirs }}"
-  loop_control:
-    loop_var: item
+  when: admin_users is defined
+  tags: ['users', 'directories']
+
+- name: "创建用户backup目录"
+  file:
+    path: "/home/{{ item.name }}/backup"
+    state: directory
+    owner: "{{ item.name }}"
+    group: "{{ item.name }}"
+    mode: '0755'
+  loop: "{{ admin_users | default([]) }}"
+  when: admin_users is defined
+  tags: ['users', 'directories']
+
+- name: "创建用户logs目录"
+  file:
+    path: "/home/{{ item.name }}/logs"
+    state: directory
+    owner: "{{ item.name }}"
+    group: "{{ item.name }}"
+    mode: '0755'
+  loop: "{{ admin_users | default([]) }}"
   when: admin_users is defined
   tags: ['users', 'directories']
 
