@@ -1,0 +1,13 @@
+---
+# 简化的主机清单文件
+all:
+  hosts:
+    server01:
+      ansible_host: 192.168.100.110
+      ansible_user: root
+      # ansible_ssh_pass: your_password  # 不推荐，建议使用密钥
+    # server02:
+    #   ansible_host: 192.168.100.111
+    #   ansible_user: root
+  vars:
+    ansible_python_interpreter: /usr/bin/python3 

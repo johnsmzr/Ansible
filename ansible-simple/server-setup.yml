@@ -1,0 +1,127 @@
+---
+# 简化的服务器初始化 Playbook
+# 运行命令: ansible-playbook -i inventory.yml server-setup.yml
+
+- name: "服务器基础配置"
+  hosts: all
+  become: yes
+  gather_facts: yes
+  
+  vars:
+    # 可修改的变量
+    server_timezone: "Asia/Shanghai"
+    install_packages:
+      - vim
+      - curl
+      - wget
+      - htop
+      - git
+      - unzip
+      - tree
+      - screen
+      - tmux
+  
+  tasks:
+    # 1. 系统基础配置
+    - name: "更新软件包缓存"
+      apt:
+        update_cache: yes
+        cache_valid_time: 86400
+      when: ansible_os_family == "Debian"
+      tags: ['system']
+
+    - name: "设置时区"
+      timezone:
+        name: "{{ server_timezone }}"
+      tags: ['system']
+
+    - name: "设置主机名"
+      hostname:
+        name: "{{ inventory_hostname }}"
+      tags: ['system']
+
+    # 2. 安装基础软件
+    - name: "安装基础工具"
+      package:
+        name: "{{ install_packages }}"
+        state: present
+      tags: ['packages']
+
+    - name: "安装Python包"
+      package:
+        name:
+          - python3
+          - python3-pip
+        state: present
+      tags: ['packages']
+
+    # 3. 系统优化配置
+    - name: "配置系统limits"
+      copy:
+        dest: /etc/security/limits.d/99-custom.conf
+        content: |
+          * soft nofile 65536
+          * hard nofile 65536
+          * soft nproc 32768
+          * hard nproc 32768
+        backup: yes
+      tags: ['optimize']
+
+    - name: "配置基础网络参数"
+      sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: yes
+      loop:
+        - { name: 'net.core.somaxconn', value: '65535' }
+        - { name: 'net.ipv4.tcp_fin_timeout', value: '10' }
+        - { name: 'net.ipv4.tcp_keepalive_time', value: '1200' }
+      ignore_errors: yes
+      tags: ['optimize']
+
+    # 4. 安全配置
+    - name: "配置SSH安全"
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        backup: yes
+      loop:
+        - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+        - { regexp: '^#?PubkeyAuthentication', line: 'PubkeyAuthentication yes' }
+        - { regexp: '^#?MaxAuthTries', line: 'MaxAuthTries 3' }
+      notify: restart ssh
+      tags: ['security']
+
+    # 5. 创建有用的别名
+    - name: "创建系统别名"
+      copy:
+        dest: /etc/profile.d/aliases.sh
+        content: |
+          alias ll='ls -alF'
+          alias la='ls -A'
+          alias l='ls -CF'
+          alias ..='cd ..'
+          alias df='df -h'
+          alias free='free -h'
+          alias top='htop'
+        mode: '0644'
+      tags: ['config']
+
+    # 6. 显示完成信息
+    - name: "显示配置完成信息"
+      debug:
+        msg: |
+          ✅ 服务器配置完成！
+          📍 主机: {{ inventory_hostname }}
+          🖥️  系统: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          🔧 已安装工具: {{ install_packages | join(', ') }}
+          🕐 时区: {{ server_timezone }}
+      tags: ['info']
+
+  handlers:
+    - name: restart ssh
+      service:
+        name: ssh
+        state: restarted 

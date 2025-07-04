@@ -1,0 +1,29 @@
+---
+# 快速测试 Playbook
+# 运行命令: ansible-playbook test.yml
+
+- name: "快速系统测试"
+  hosts: all
+  gather_facts: yes
+  
+  tasks:
+    - name: "测试连接"
+      ping:
+      
+    - name: "获取系统信息"
+      debug:
+        msg: |
+          🖥️  主机名: {{ inventory_hostname }}
+          🌐 IP地址: {{ ansible_default_ipv4.address }}
+          📦 系统: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          💾 内存: {{ (ansible_memtotal_mb/1024)|round(1) }}GB
+          💿 磁盘: {{ ansible_mounts[0].size_total|filesizeformat }}
+          ⏰ 时间: {{ ansible_date_time.iso8601 }}
+          
+    - name: "检查磁盘使用情况"
+      shell: df -h /
+      register: disk_usage
+      
+    - name: "显示磁盘使用"
+      debug:
+        var: disk_usage.stdout_lines 
