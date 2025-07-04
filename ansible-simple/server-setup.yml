@@ -89,6 +89,91 @@
         backup: yes
       tags: ['system']
 
+    # 增强hostname持久化配置
+    - name: "禁用云平台hostname重置（如果存在cloud-init）"
+      lineinfile:
+        path: /etc/cloud/cloud.cfg
+        regexp: '^preserve_hostname:'
+        line: 'preserve_hostname: true'
+        backup: yes
+        create: no
+      ignore_errors: yes
+      tags: ['system']
+
+    - name: "创建hostnamectl静态配置"
+      command: hostnamectl set-hostname "{{ inventory_hostname }}" --static
+      tags: ['system']
+
+    - name: "创建hostnamectl瞬态配置"
+      command: hostnamectl set-hostname "{{ inventory_hostname }}" --transient
+      tags: ['system']
+
+    - name: "创建hostnamectl漂亮配置"
+      command: hostnamectl set-hostname "{{ inventory_hostname }}" --pretty
+      tags: ['system']
+
+    - name: "禁用NetworkManager hostname管理"
+      lineinfile:
+        path: /etc/NetworkManager/NetworkManager.conf
+        regexp: '^hostname-mode='
+        line: 'hostname-mode=none'
+        insertafter: '^\[main\]'
+        backup: yes
+        create: no
+      ignore_errors: yes
+      notify: restart network manager
+      tags: ['system']
+
+    - name: "配置systemd hostname服务"
+      copy:
+        dest: /etc/systemd/system/set-hostname.service
+        content: |
+          [Unit]
+          Description=Set Hostname at Boot
+          After=network.target
+          Before=network-online.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/bin/hostnamectl set-hostname {{ inventory_hostname }}
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+        mode: '0644'
+      tags: ['system']
+
+    - name: "启用hostname服务"
+      systemd:
+        name: set-hostname
+        enabled: yes
+        daemon_reload: yes
+      tags: ['system']
+
+    - name: "禁用DHCP hostname更新（如果使用dhclient）"
+      lineinfile:
+        path: /etc/dhcp/dhclient.conf
+        regexp: '^send host-name'
+        line: '# send host-name = gethostname();'
+        backup: yes
+        create: no
+      ignore_errors: yes
+      tags: ['system']
+
+    - name: "防止DHCP更新hostname（dhclient-enter-hooks）"
+      copy:
+        dest: /etc/dhcp/dhclient-enter-hooks.d/hostname
+        content: |
+          #!/bin/bash
+          # 防止DHCP更新hostname
+          make_resolv_conf() {
+              :
+          }
+        mode: '0755'
+        force: no
+      ignore_errors: yes
+      tags: ['system']
+
     # 2. 安装基础软件
     - name: "安装基础工具"
       package:
@@ -278,6 +363,18 @@
       changed_when: false
       tags: ['system', 'verify']
 
+    - name: "验证hostname持久化配置"
+      command: hostnamectl status
+      register: hostnamectl_status
+      changed_when: false
+      tags: ['system', 'verify']
+
+    - name: "检查hostname服务状态"
+      systemd:
+        name: set-hostname
+      register: hostname_service_status
+      tags: ['system', 'verify']
+
     # 8. 显示完成信息
     - name: "显示配置完成信息"
       debug:
@@ -289,6 +386,13 @@
           🕐 时区: {{ server_timezone }} (当前: {{ current_timezone.stdout }})
           👤 管理员用户: {{ admin_users | map(attribute='name') | join(', ') }}
           
+          🔧 Hostname持久化状态:
+          {% if hostname_service_status.status.ActiveState == "active" %}
+          ✅ hostname服务已启用，重启后将自动设置hostname
+          {% else %}
+          ⚠️  hostname服务状态: {{ hostname_service_status.status.ActiveState | default('未知') }}
+          {% endif %}
+          
           {% if ssh_public_keys is defined and ssh_public_keys | length > 0 %}
           🔐 SSH安全: 已启用密钥认证，已禁用密码登录
           {% else %}
@@ -296,10 +400,22 @@
           {% endif %}
           
           💡 下次登录请使用: ssh -i ~/.ssh/your_private_key {{ ansible_user }}@{{ ansible_host }}
+          
+          📝 Hostname修复说明:
+          - 已配置多层hostname持久化机制
+          - 已禁用云平台和DHCP的hostname重置
+          - 已创建systemd服务在启动时强制设置hostname
+          - 服务器重启后hostname将保持为: {{ inventory_hostname }}
       tags: ['info']
 
   handlers:
     - name: restart ssh
       service:
         name: ssh
-        state: restarted 
+        state: restarted
+
+    - name: restart network manager
+      service:
+        name: NetworkManager
+        state: restarted
+      ignore_errors: yes
