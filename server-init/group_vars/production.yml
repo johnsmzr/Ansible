@@ -26,4 +26,15 @@ backup_enabled: true
 backup_retention_days: 30
 
 # 性能优化（生产环境更保守）
-vm_swappiness: 1 
+vm_swappiness: 1
+
+# 密码配置（使用ansible-vault加密）
+# 创建加密密码文件的方法：
+# ansible-vault create group_vars/production/vault.yml
+# 然后在vault.yml中添加：
+# vault_ansible_ssh_pass: your_password
+# vault_ansible_become_pass: your_password
+# 
+# 使用时：
+# ansible_ssh_pass: "{{ vault_ansible_ssh_pass }}"
+# ansible_become_pass: "{{ vault_ansible_become_pass }}" 

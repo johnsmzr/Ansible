@@ -24,6 +24,8 @@ LIMIT=""
 EXTRA_VARS=""
 CHECK_MODE=""
 VERBOSE=""
+ASK_PASS=""
+ASK_BECOME_PASS=""
 
 # 显示帮助信息
 show_help() {
@@ -42,9 +44,11 @@ show_help() {
     echo "  -v, --verbose           详细输出"
     echo "  --quick                 快速安装（仅安装基础工具）"
     echo "  --security              仅执行安全配置"
-    echo "  --syntax-check          语法检查"
-    echo "  --list-hosts            列出目标主机"
-    echo "  --list-tasks            列出所有任务"
+      echo "  --syntax-check          语法检查"
+  echo "  --list-hosts            列出目标主机"
+  echo "  --list-tasks            列出所有任务"
+  echo "  --ask-pass              询问SSH密码"
+  echo "  --ask-become-pass       询问sudo密码"
     echo ""
     echo "示例:"
     echo "  $0                                    # 完整部署所有主机"
@@ -129,6 +133,8 @@ run_deployment() {
     [[ -n "$EXTRA_VARS" ]] && cmd="$cmd --extra-vars \"$EXTRA_VARS\""
     [[ -n "$CHECK_MODE" ]] && cmd="$cmd --check"
     [[ -n "$VERBOSE" ]] && cmd="$cmd -v"
+    [[ -n "$ASK_PASS" ]] && cmd="$cmd --ask-pass"
+    [[ -n "$ASK_BECOME_PASS" ]] && cmd="$cmd --ask-become-pass"
     
     echo -e "${YELLOW}执行命令: $cmd${NC}"
     echo ""
@@ -206,6 +212,14 @@ while [[ $# -gt 0 ]]; do
             check_playbook "$PLAYBOOK"
             list_tasks
             exit 0
+            ;;
+        --ask-pass)
+            ASK_PASS="--ask-pass"
+            shift
+            ;;
+        --ask-become-pass)
+            ASK_BECOME_PASS="--ask-become-pass"
+            shift
             ;;
         *)
             echo -e "${RED}未知选项: $1${NC}"
