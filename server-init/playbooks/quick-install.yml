@@ -8,10 +8,17 @@
   gather_facts: yes
   
   tasks:
-    - name: "更新系统包缓存"
-      package:
+    - name: "更新软件包缓存 (Ubuntu/Debian)"
+      apt:
         update_cache: yes
-      when: ansible_os_family in ['Debian', 'RedHat']
+        cache_valid_time: 86400  # 24小时内有效，避免频繁更新
+      when: ansible_os_family == "Debian"
+      tags: ['update']
+
+    - name: "更新软件包缓存 (CentOS/RHEL/Rocky)"
+      yum:
+        update_cache: yes
+      when: ansible_os_family == "RedHat"
       tags: ['update']
 
     - name: "安装基础工具 (CentOS/RHEL/Rocky)"

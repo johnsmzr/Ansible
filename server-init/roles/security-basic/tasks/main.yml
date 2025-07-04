@@ -1,6 +1,13 @@
 ---
 # 基础安全配置任务
 
+- name: "更新软件包缓存 (Ubuntu/Debian)"
+  apt:
+    update_cache: yes
+    cache_valid_time: 86400  # 24小时内有效，避免频繁更新
+  when: ansible_os_family == "Debian"
+  tags: ['packages', 'cache']
+
 - name: "配置SSH安全设置"
   lineinfile:
     path: /etc/ssh/sshd_config
