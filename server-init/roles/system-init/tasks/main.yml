@@ -44,7 +44,7 @@
     backup: yes
   tags: ['limits']
 
-- name: "配置内核参数"
+- name: "配置内核参数 - 网络相关"
   sysctl:
     name: "{{ item.name }}"
     value: "{{ item.value }}"
@@ -53,13 +53,57 @@
     reload: yes
   loop:
     - { name: 'net.core.somaxconn', value: '65535' }
-    - { name: 'net.core.netdev_max_backlog', value: '32768' }
     - { name: 'net.ipv4.tcp_max_syn_backlog', value: '65535' }
     - { name: 'net.ipv4.tcp_fin_timeout', value: '10' }
     - { name: 'net.ipv4.tcp_keepalive_time', value: '1200' }
     - { name: 'net.ipv4.ip_local_port_range', value: '10000 65000' }
-    - { name: 'vm.swappiness', value: '10' }
-    - { name: 'fs.file-max', value: '6553560' }
+  ignore_errors: yes  # 某些参数在特定系统上可能不存在
+  tags: ['sysctl', 'kernel', 'network']
+
+- name: "配置内核参数 - 可选网络参数"
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    sysctl_set: yes
+    state: present
+    reload: yes
+  loop:
+    - { name: 'net.core.netdev_max_backlog', value: '32768' }
+  ignore_errors: yes  # 这个参数在某些系统上不存在
+  tags: ['sysctl', 'kernel', 'network']
+
+- name: "检查 vm.swappiness 参数是否可用"
+  stat:
+    path: /proc/sys/vm/swappiness
+  register: swappiness_exists
+  tags: ['sysctl', 'kernel']
+
+- name: "配置内核参数 - VM相关"
+  sysctl:
+    name: vm.swappiness
+    value: '10'
+    sysctl_set: yes
+    state: present
+    reload: yes
+  when: swappiness_exists.stat.exists
+  ignore_errors: yes
+  tags: ['sysctl', 'kernel']
+
+- name: "检查 fs.file-max 参数是否可用"
+  stat:
+    path: /proc/sys/fs/file-max
+  register: filemax_exists
+  tags: ['sysctl', 'kernel']
+
+- name: "配置内核参数 - 文件系统相关"
+  sysctl:
+    name: fs.file-max
+    value: '6553560'
+    sysctl_set: yes
+    state: present
+    reload: yes
+  when: filemax_exists.stat.exists
+  ignore_errors: yes
   tags: ['sysctl', 'kernel']
 
 - name: "创建常用目录"
