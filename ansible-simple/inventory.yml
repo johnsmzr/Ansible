@@ -5,7 +5,7 @@ all:
     server01:
       ansible_host: 192.168.100.110
       ansible_user: root
-      # ansible_ssh_pass: your_password  # 不推荐，建议使用密钥
+      ansible_ssh_pass: your_password  # 不推荐，建议使用密钥
     # server02:
     #   ansible_host: 192.168.100.111
     #   ansible_user: root
