@@ -10,6 +10,17 @@
   vars:
     # 可修改的变量
     server_timezone: "Asia/Shanghai"
+    # SSH公钥配置 - 请添加你的公钥内容
+    ssh_public_keys:
+      - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... your-public-key-here"
+      # - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... another-key-here"
+    
+    # 用户配置
+    admin_users:
+      - name: "{{ ansible_user }}"  # 使用当前连接的用户
+        groups: ["sudo"]
+        shell: "/bin/bash"
+    
     install_packages:
       - vim
       - curl
@@ -93,7 +104,84 @@
         state: present
       tags: ['packages']
 
-    # 3. 系统优化配置
+    # 3. 用户和SSH密钥管理
+    - name: "确保管理员用户存在"
+      user:
+        name: "{{ item.name }}"
+        groups: "{{ item.groups }}"
+        shell: "{{ item.shell }}"
+        append: yes
+        create_home: yes
+      loop: "{{ admin_users }}"
+      tags: ['users', 'security']
+
+    - name: "为管理员用户创建.ssh目录"
+      file:
+        path: "/home/{{ item.name }}/.ssh"
+        state: directory
+        owner: "{{ item.name }}"
+        group: "{{ item.name }}"
+        mode: '0700'
+      loop: "{{ admin_users }}"
+      when: item.name != 'root'
+      tags: ['users', 'security']
+
+    - name: "为root用户创建.ssh目录"
+      file:
+        path: "/root/.ssh"
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+      when: "'root' in admin_users | map(attribute='name') | list"
+      tags: ['users', 'security']
+
+    - name: "添加SSH公钥到管理员用户"
+      authorized_key:
+        user: "{{ item.0.name }}"
+        key: "{{ item.1 }}"
+        state: present
+        exclusive: no
+      loop: "{{ admin_users | product(ssh_public_keys) | list }}"
+      when: ssh_public_keys is defined and ssh_public_keys | length > 0
+      tags: ['users', 'security']
+
+    - name: "验证SSH公钥是否已正确配置"
+      command: "ls -la /home/{{ ansible_user }}/.ssh/authorized_keys"
+      register: ssh_key_check
+      failed_when: false
+      changed_when: false
+      when: ansible_user != 'root'
+      tags: ['security', 'verify']
+
+    - name: "验证root用户SSH公钥配置"
+      command: "ls -la /root/.ssh/authorized_keys"
+      register: root_ssh_key_check
+      failed_when: false
+      changed_when: false
+      when: ansible_user == 'root'
+      tags: ['security', 'verify']
+
+    - name: "显示SSH密钥配置状态"
+      debug:
+        msg: |
+          🔑 SSH密钥配置状态:
+          {% if ansible_user != 'root' and ssh_key_check.rc == 0 %}
+          ✅ 用户 {{ ansible_user }} 的公钥已配置
+          {% elif ansible_user == 'root' and root_ssh_key_check.rc == 0 %}
+          ✅ root用户的公钥已配置
+          {% else %}
+          ⚠️  警告：未检测到SSH公钥配置！
+          {% endif %}
+          
+          📝 请确认以下公钥已正确添加：
+          {% for key in ssh_public_keys %}
+          - {{ key[:50] }}...
+          {% endfor %}
+      when: ssh_public_keys is defined
+      tags: ['security', 'verify']
+
+    # 4. 系统优化配置
     - name: "配置系统limits"
       copy:
         dest: /etc/security/limits.d/99-custom.conf
@@ -118,8 +206,22 @@
       ignore_errors: yes
       tags: ['optimize']
 
-    # 4. 安全配置
-    - name: "配置SSH安全"
+    # 5. SSH安全配置（在公钥配置完成后）
+    - name: "警告：即将配置SSH安全设置"
+      pause:
+        prompt: |
+          ⚠️  即将禁用SSH密码认证！
+          
+          请确认：
+          1. SSH公钥已正确配置
+          2. 你能够使用密钥登录
+          
+          按 Enter 继续，或 Ctrl+C 取消
+        seconds: 10
+      when: ssh_public_keys is defined and ssh_public_keys | length > 0
+      tags: ['security']
+
+    - name: "配置SSH安全设置"
       lineinfile:
         path: /etc/ssh/sshd_config
         regexp: "{{ item.regexp }}"
@@ -129,10 +231,26 @@
         - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
         - { regexp: '^#?PubkeyAuthentication', line: 'PubkeyAuthentication yes' }
         - { regexp: '^#?MaxAuthTries', line: 'MaxAuthTries 3' }
+        - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin prohibit-password' }
+        - { regexp: '^#?AuthorizedKeysFile', line: 'AuthorizedKeysFile .ssh/authorized_keys' }
       notify: restart ssh
+      when: ssh_public_keys is defined and ssh_public_keys | length > 0
       tags: ['security']
 
-    # 5. 创建有用的别名
+    - name: "跳过SSH安全配置（未配置公钥）"
+      debug:
+        msg: |
+          ⚠️  跳过SSH安全配置！
+          
+          原因：未配置SSH公钥
+          
+          要启用SSH安全配置，请：
+          1. 在vars中添加你的SSH公钥到 ssh_public_keys
+          2. 重新运行playbook：ansible-playbook server-setup.yml --tags security
+      when: ssh_public_keys is not defined or ssh_public_keys | length == 0
+      tags: ['security']
+
+    # 6. 创建有用的别名
     - name: "创建系统别名"
       copy:
         dest: /etc/profile.d/aliases.sh
@@ -147,7 +265,7 @@
         mode: '0644'
       tags: ['config']
 
-    # 6. 验证配置
+    # 7. 验证配置
     - name: "验证时区设置"
       command: timedatectl show --property=Timezone --value
       register: current_timezone
@@ -160,7 +278,7 @@
       changed_when: false
       tags: ['system', 'verify']
 
-    # 7. 显示完成信息
+    # 8. 显示完成信息
     - name: "显示配置完成信息"
       debug:
         msg: |
@@ -169,8 +287,15 @@
           🖥️  系统: {{ ansible_distribution }} {{ ansible_distribution_version }}
           🔧 已安装工具: {{ install_packages | join(', ') }}
           🕐 时区: {{ server_timezone }} (当前: {{ current_timezone.stdout }})
+          👤 管理员用户: {{ admin_users | map(attribute='name') | join(', ') }}
           
-          ⚠️  注意：主机名和时区的完全生效可能需要重启系统
+          {% if ssh_public_keys is defined and ssh_public_keys | length > 0 %}
+          🔐 SSH安全: 已启用密钥认证，已禁用密码登录
+          {% else %}
+          ⚠️  SSH安全: 未配置（仍允许密码登录）
+          {% endif %}
+          
+          💡 下次登录请使用: ssh -i ~/.ssh/your_private_key {{ ansible_user }}@{{ ansible_host }}
       tags: ['info']
 
   handlers:
